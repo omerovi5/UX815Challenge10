@@ -4,307 +4,124 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>JSONPlaceholder Explorer</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="jp-screen.css">
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #f5f5f5;
+      color: #1a1a1a;
+    }
+
+    h1 { margin-bottom: 0.25rem; }
+    p.subtitle { color: #666; margin-bottom: 1.5rem; }
+
+    /* Tab bar */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .tabs button {
+      padding: 8px 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .tabs button.active {
+      background: #1a1a2e;
+      color: #fff;
+      border-color: #1a1a2e;
+    }
+
+    /* Cards */
+    #output {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .card .meta  { font-size: 11px; color: #999; margin-bottom: 6px; }
+    .card .title { font-size: 14px; font-weight: 600; margin-bottom: 6px; text-transform: capitalize; }
+    .card .body  { font-size: 13px; color: #555; line-height: 1.5; }
+  </style>
 </head>
 <body>
 
-  <!-- ── Header ── -->
-  <header class="site-header">
-    <div>
-      <h1><i class="bi bi-braces"></i> JSONPlaceholder Explorer</h1>
-      <p>Browsing fake data from jsonplaceholder.typicode.com</p>
-    </div>
-    <span class="header-badge">Free Fake API</span>
-  </header>
+  <h1>JSONPlaceholder Explorer</h1>
+  <p class="subtitle">Browsing fake data from jsonplaceholder.typicode.com</p>
 
-  <!-- ── Tab bar ── -->
-  <nav class="tab-bar" id="tabBar">
-    <button class="tab-btn active" data-resource="posts">
-      <i class="bi bi-file-text"></i> Posts
-      <span class="tab-count">100</span>
-    </button>
-    <button class="tab-btn" data-resource="users">
-      <i class="bi bi-people"></i> Users
-      <span class="tab-count">10</span>
-    </button>
-    <button class="tab-btn" data-resource="todos">
-      <i class="bi bi-check2-square"></i> Todos
-      <span class="tab-count">200</span>
-    </button>
-    <button class="tab-btn" data-resource="comments">
-      <i class="bi bi-chat-dots"></i> Comments
-      <span class="tab-count">500</span>
-    </button>
-    <button class="tab-btn" data-resource="albums">
-      <i class="bi bi-collection"></i> Albums
-      <span class="tab-count">100</span>
-    </button>
-  </nav>
+  <div class="tabs">
+    <button class="active" onclick="load('posts')">Posts</button>
+    <button onclick="load('users')">Users</button>
+    <button onclick="load('todos')">Todos</button>
+    <button onclick="load('comments')">Comments</button>
+    <button onclick="load('albums')">Albums</button>
+  </div>
 
-  <!-- ── Content ── -->
-  <main class="content-area">
-
-    <!-- Toolbar -->
-    <div class="toolbar">
-      <div class="search-box">
-        <i class="bi bi-search search-icon"></i>
-        <input type="text" id="searchInput" placeholder="Filter results…">
-      </div>
-      <span class="results-info" id="resultsInfo"></span>
-    </div>
-
-    <!-- Output -->
-    <div id="output"></div>
-
-    <!-- Pagination -->
-    <div class="pagination" id="pagination"></div>
-
-  </main>
+  <div id="output">Loading…</div>
 
   <script>
-    const BASE = 'https://jsonplaceholder.typicode.com';
-    const PAGE_SIZE = 12;
+    async function load(resource) {
+      // Mark active tab
+      document.querySelectorAll('.tabs button').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.toLowerCase() === resource);
+      });
 
-    // Avatar colours for users
-    const AVATAR_COLORS = [
-      '#e74c3c','#e67e22','#f1c40f','#2ecc71',
-      '#1abc9c','#3498db','#9b59b6','#e91e63',
-      '#00bcd4','#ff5722'
-    ];
+      document.getElementById('output').textContent = 'Loading…';
 
-    let allData     = [];
-    let filtered    = [];
-    let currentPage = 1;
-    let currentResource = 'posts';
+      const res  = await fetch(`https://jsonplaceholder.typicode.com/${resource}`);
+      const data = await res.json();
 
-    // ── Fetch ──────────────────────────────────────────────
-    async function loadResource(resource) {
       const output = document.getElementById('output');
-      output.innerHTML = `
-        <div class="state-box">
-          <div class="spinner"></div>
-          <p>Fetching /${resource}…</p>
-        </div>`;
-      document.getElementById('pagination').innerHTML = '';
-      document.getElementById('resultsInfo').textContent = '';
+      output.innerHTML = '';
 
-      try {
-        const res  = await fetch(`${BASE}/${resource}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        allData = await res.json();
-        document.getElementById('searchInput').value = '';
-        filtered = allData;
-        currentPage = 1;
-        render();
-      } catch (err) {
-        output.innerHTML = `
-          <div class="state-box error">
-            <i class="bi bi-exclamation-triangle" style="font-size:32px;"></i>
-            <p style="margin-top:12px;">Failed to load data: ${err.message}</p>
-          </div>`;
-      }
-    }
-
-    // ── Render current page ────────────────────────────────
-    function render() {
-      const start  = (currentPage - 1) * PAGE_SIZE;
-      const slice  = filtered.slice(start, start + PAGE_SIZE);
-      const output = document.getElementById('output');
-
-      if (filtered.length === 0) {
-        output.innerHTML = `
-          <div class="state-box">
-            <i class="bi bi-search" style="font-size:32px;"></i>
-            <p style="margin-top:12px;">No results found.</p>
-          </div>`;
-        document.getElementById('pagination').innerHTML = '';
-        document.getElementById('resultsInfo').textContent = '0 results';
-        return;
-      }
-
-      document.getElementById('resultsInfo').textContent =
-        `Showing ${start + 1}–${Math.min(start + PAGE_SIZE, filtered.length)} of ${filtered.length}`;
-
-      // Pick layout
-      const isSingle = ['users','todos'].includes(currentResource);
-      const grid = document.createElement('div');
-      grid.className = 'cards-grid' + (isSingle ? ' single-col' : '');
-
-      slice.forEach(item => {
+      data.forEach(item => {
         const card = document.createElement('div');
         card.className = 'card';
-        card.innerHTML = buildCard(item, currentResource);
-        grid.appendChild(card);
+        card.innerHTML = buildCard(item, resource);
+        output.appendChild(card);
       });
-
-      output.innerHTML = '';
-      output.appendChild(grid);
-      renderPagination();
     }
 
-    // ── Card templates ─────────────────────────────────────
     function buildCard(item, resource) {
-      switch (resource) {
+      if (resource === 'posts')
+        return `<div class="meta">#${item.id} · User ${item.userId}</div>
+                <div class="title">${item.title}</div>
+                <div class="body">${item.body}</div>`;
 
-        case 'posts':
-          return `
-            <div class="card-id">#${item.id} · User ${item.userId}</div>
-            <div class="card-title">${escHtml(item.title)}</div>
-            <div class="card-body">${escHtml(item.body)}</div>`;
+      if (resource === 'users')
+        return `<div class="title">${item.name}</div>
+                <div class="body">@${item.username}<br>${item.email}<br>${item.address.city}</div>`;
 
-        case 'comments':
-          return `
-            <div class="card-id">Post #${item.postId} · Comment #${item.id}</div>
-            <div class="card-title">${escHtml(item.name)}</div>
-            <div class="card-body">${escHtml(item.body)}</div>
-            <div class="card-meta">
-              <span class="chip email"><i class="bi bi-envelope"></i> ${escHtml(item.email)}</span>
-            </div>`;
+      if (resource === 'todos')
+        return `<div class="meta">${item.completed ? '✅ Done' : '⏳ Pending'} · User ${item.userId}</div>
+                <div class="title">${item.title}</div>`;
 
-        case 'albums':
-          return `
-            <div class="card-id">#${item.id} · User ${item.userId}</div>
-            <div class="card-title">${escHtml(item.title)}</div>`;
+      if (resource === 'comments')
+        return `<div class="meta">Post #${item.postId}</div>
+                <div class="title">${item.name}</div>
+                <div class="body">${item.email}<br>${item.body}</div>`;
 
-        case 'todos': {
-          const done = item.completed;
-          return `
-            <div class="todo-card">
-              <div class="todo-check ${done ? 'done' : ''}">
-                ${done ? '<i class="bi bi-check"></i>' : ''}
-              </div>
-              <div>
-                <div class="todo-title ${done ? 'done' : ''}">${escHtml(item.title)}</div>
-                <div class="card-meta" style="border:none; padding:4px 0 0; margin:0;">
-                  <span class="chip ${done ? 'done' : 'todo'}">${done ? 'Completed' : 'Pending'}</span>
-                  <span class="chip">User ${item.userId}</span>
-                </div>
-              </div>
-            </div>`;
-        }
-
-        case 'users': {
-          const initials = item.name.split(' ').map(w => w[0]).join('').slice(0,2);
-          const color    = AVATAR_COLORS[(item.id - 1) % AVATAR_COLORS.length];
-          return `
-            <div class="user-card">
-              <div class="user-avatar" style="background:${color}">${initials}</div>
-              <div>
-                <div class="user-name">${escHtml(item.name)}</div>
-                <div class="user-username">@${escHtml(item.username)}</div>
-                <div class="user-detail"><i class="bi bi-envelope"></i> ${escHtml(item.email)}</div>
-                <div class="user-detail"><i class="bi bi-telephone"></i> ${escHtml(item.phone)}</div>
-                <div class="user-detail"><i class="bi bi-geo-alt"></i> ${escHtml(item.address.city)}</div>
-                <div class="user-detail"><i class="bi bi-globe"></i> ${escHtml(item.website)}</div>
-                <div class="user-detail"><i class="bi bi-building"></i> ${escHtml(item.company.name)}</div>
-              </div>
-            </div>`;
-        }
-
-        default:
-          return `<pre>${JSON.stringify(item, null, 2)}</pre>`;
-      }
+      if (resource === 'albums')
+        return `<div class="meta">#${item.id} · User ${item.userId}</div>
+                <div class="title">${item.title}</div>`;
     }
 
-    // ── Pagination ─────────────────────────────────────────
-    function renderPagination() {
-      const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-      if (totalPages <= 1) {
-        document.getElementById('pagination').innerHTML = '';
-        return;
-      }
-
-      const nav = document.getElementById('pagination');
-      nav.innerHTML = '';
-
-      // Prev
-      const prev = makePageBtn('← Prev', currentPage === 1);
-      prev.addEventListener('click', () => { currentPage--; render(); scrollToTop(); });
-      nav.appendChild(prev);
-
-      // Page numbers (show a window of 5)
-      const window5 = pageWindow(currentPage, totalPages, 5);
-      window5.forEach(p => {
-        if (p === '…') {
-          const el = document.createElement('span');
-          el.className = 'page-info';
-          el.textContent = '…';
-          nav.appendChild(el);
-        } else {
-          const btn = makePageBtn(p, false);
-          if (p === currentPage) btn.classList.add('active');
-          btn.addEventListener('click', () => { currentPage = p; render(); scrollToTop(); });
-          nav.appendChild(btn);
-        }
-      });
-
-      // Next
-      const next = makePageBtn('Next →', currentPage === totalPages);
-      next.addEventListener('click', () => { currentPage++; render(); scrollToTop(); });
-      nav.appendChild(next);
-    }
-
-    function makePageBtn(label, disabled) {
-      const btn = document.createElement('button');
-      btn.className = 'page-btn';
-      btn.textContent = label;
-      btn.disabled = disabled;
-      return btn;
-    }
-
-    function pageWindow(current, total, size) {
-      const half  = Math.floor(size / 2);
-      let start   = Math.max(1, current - half);
-      let end     = Math.min(total, start + size - 1);
-      if (end - start < size - 1) start = Math.max(1, end - size + 1);
-
-      const pages = [];
-      if (start > 1) { pages.push(1); if (start > 2) pages.push('…'); }
-      for (let i = start; i <= end; i++) pages.push(i);
-      if (end < total) { if (end < total - 1) pages.push('…'); pages.push(total); }
-      return pages;
-    }
-
-    function scrollToTop() {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    // ── Search / filter ────────────────────────────────────
-    document.getElementById('searchInput').addEventListener('input', e => {
-      const q = e.target.value.toLowerCase().trim();
-      if (!q) {
-        filtered = allData;
-      } else {
-        filtered = allData.filter(item =>
-          JSON.stringify(item).toLowerCase().includes(q)
-        );
-      }
-      currentPage = 1;
-      render();
-    });
-
-    // ── Tab switching ──────────────────────────────────────
-    document.getElementById('tabBar').addEventListener('click', e => {
-      const btn = e.target.closest('.tab-btn');
-      if (!btn) return;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      currentResource = btn.dataset.resource;
-      loadResource(currentResource);
-    });
-
-    // ── Helpers ────────────────────────────────────────────
-    function escHtml(str) {
-      return String(str ?? '')
-        .replace(/&/g,'&amp;')
-        .replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;');
-    }
-
-    // ── Boot ───────────────────────────────────────────────
-    loadResource('posts');
+    load('posts');
   </script>
 
 </body>
